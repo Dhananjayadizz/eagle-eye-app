@@ -745,6 +745,7 @@ def process_video(video_path):
     frame_count = 0
     prev_frame = None
     prev_tracks = {}
+    event_counter = 0 # Initialize event counter for SocketIO emissions
 
     try:
         while cap.isOpened():
@@ -875,10 +876,12 @@ def process_video(video_path):
 
                 if is_critical_event:
                     db.session.add(event)
+                    db.session.flush() # Assigns an ID without committing the transaction
 
                 try:
+                    event_counter += 1 # Increment counter for each emitted event
                     event_data = {
-                        "id": event.id,
+                        "id": event_counter, # Use the counter-based ID for SocketIO
                         "vehicle_id": tid,
                         "event_type": event_type,
                         "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
