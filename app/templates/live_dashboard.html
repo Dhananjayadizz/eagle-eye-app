@@ -5,20 +5,17 @@
 {% block content %}
 <div class="container">
     <h2>Live Monitoring Dashboard</h2>
-    <p>Real-time video stream and event display.</p>
+    <p>Real-time processed video stream with bounding boxes.</p>
 
-    <!-- Content area for Live Stream and Critical Events Table -->
     <div class="row">
         <div class="col-md-8">
-            <!-- Video Feed -->
-            <!-- <img src="" id="videoFeed" class="img-fluid" alt="Live Feed"> -->
-            <!-- <video id="live-video-container" class="img-fluid" autoplay playsinline muted></video> -->
-            <img id="live-video-container" class="img-fluid" alt="Live Feed">
+            <div>
+                <h4>Processed Video Stream</h4>
+                <!-- Show only this processed stream -->
+                <img id="processed-video-feed" alt="Processed Live Feed" class="img-fluid" />
+            </div>
 
-
-
-
-            <!-- Camera Selection Dropdown -->
+            <!-- If you want to keep camera select and buttons, keep this, else remove -->
             <div class="mt-4">
                 <h3>Select Camera Feed</h3>
                 <div class="mb-3">
@@ -33,7 +30,7 @@
         </div>
 
         <div class="col-md-4">
-            <!-- Critical Events Table -->
+            <!-- Optional: keep or remove the critical events table -->
             <h3>Critical Events</h3>
             <button id="export-critical-events-btn" class="btn btn-primary btn-sm mb-3">Export Critical Events</button>
             <div style="max-height: 600px; overflow-y: auto;">
@@ -62,6 +59,5 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
 <script src="{{ url_for('static', filename='js/livestream.js') }}"></script>
-
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% endblock %}
