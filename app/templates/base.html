@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
+    <style>
+        .nav-link {
+            color: #333;
+            font-weight: 500;
+            position: relative;
+            padding: 0.5rem 1rem;
+        }
+        .nav-link:hover {
+            color: #007bff;
+        }
+        .nav-link.active {
+            color: #007bff;
+            font-weight: 600;
+        }
+        .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: #007bff;
+            border-radius: 3px 3px 0 0;
+        }
+        /* Special styles for Live tab */
+        #nav-live {
+            color: #dc3545 !important;
+        }
+        #nav-live:hover {
+            color: #dc3545 !important;
+            opacity: 0.8;
+        }
+        #nav-live.active {
+            color: #dc3545 !important;
+        }
+        #nav-live.active::after {
+            background-color: #dc3545;
+        }
+        .content {
+            padding: 2rem;
+        }
+        .navbar-brand {
+            display: flex;
+            align-items: center; /* Vertically center logo and text */
+            /* To horizontally center the brand within the navbar, additional styling on the container or navbar might be needed */
+        }
+        .navbar-brand img {
+            height: 20px; /* Adjust as needed */
+            margin-right: 5px; /* Add a small margin to the right of the logo */
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container text-center">
+            <a class="navbar-brand" href="/">
+                <img src="{{ url_for('static', filename='images/bald-eagle.png') }}" alt="EagleEyeAI Logo" class="me-2">
+                EagleEyeAI
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-center" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/" id="nav-home">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/live" id="nav-live">
+                            <i class="bi bi-broadcast-pin me-1"></i>Live
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/section1" id="nav-section1">Critical Events Analysis</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/section2" id="nav-section2">Traffic Analysis</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/section3" id="nav-section3">Blockchain Store</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/section4" id="nav-section4">Pedestrians Analysis</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="container mt-3">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="container content">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get current path
+            const currentPath = window.location.pathname;
+            
+            // Remove trailing slash if present
+            const path = currentPath.endsWith('/') ? currentPath.slice(0, -1) : currentPath;
+            
+            // Get the corresponding nav element
+            let navId;
+            if (path === '') {
+                navId = 'nav-home';
+            } else {
+                navId = 'nav-' + path.substring(1);
+            }
+            
+            // Add active class to the current nav item
+            const activeNav = document.getElementById(navId);
+            if (activeNav) {
+                activeNav.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html> 

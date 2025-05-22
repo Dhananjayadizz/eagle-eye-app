@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <h1 class="display-4">Welcome to EagleEyeAI</h1>
+    <p class="lead">Advanced AI-powered monitoring and analysis system</p>
+    <div class="row mt-5 justify-content-center">
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Live Monitoring</h5>
+                    <p class="card-text">Access the live monitoring dashboard for real-time system status.</p>
+                    <a href="/live" class="btn btn-primary">Go to Live Dashboard</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Critical Events Analysis</h5>
+                    <p class="card-text">Analyze critical events (Sudden Stops, Loss of Control, TTC) and incidents in real-time.</p>
+                    <a href="/section1" class="btn btn-primary">View Analysis</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Road Events Analysis</h5>
+                    <p class="card-text">Monitor and analyze road-related events and conditions.</p>
+                    <a href="/section2" class="btn btn-primary">View Analysis</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Blockchain Store</h5>
+                    <p class="card-text">Access and manage blockchain-stored data and transactions.</p>
+                    <a href="/section3" class="btn btn-primary">View Store</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Pedestrians Analysis</h5>
+                    <p class="card-text">Track and analyze pedestrian movement and patterns.</p>
+                    <a href="/section4" class="btn btn-primary">View Analysis</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Critical Events Section -->
+<div class="tab-pane fade" id="critical" role="tabpanel" aria-labelledby="critical-tab">
+    <h2>Critical Events</h2>
+    <p>Real-time log of detected critical events.</p>
+    <button id="export-critical-events-btn" class="btn btn-primary mb-3">Export Critical Events</button>
+    <table class="table table-striped table-hover table-sm critical-events-table-compact">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Time</th>
+                <th>Event Type</th>
+                <th>Vehicle ID</th>
+                <th>Status</th>
+                <th>TTC</th>
+                <th>GPS Coordinates</th>
+            </tr>
+        </thead>
+        <tbody id="critical-events-table">
+            <!-- Events populated dynamically -->
+        </tbody>
+    </table>
+</div>
+<!-- End Critical Events Section -->
+
+<div class="tab-pane fade" id="settings" role="tabpanel" aria-labelledby="settings-tab">
+{% endblock %}
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html> 

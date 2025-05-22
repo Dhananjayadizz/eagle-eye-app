@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Pedestrians Analysis{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>Pedestrians Analysis</h2>
+    <p>Analysis of pedestrian movement and behavior.</p>
+    
+    <div class="row mt-4">
+        <!-- Video Upload Section -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Upload Video</h5>
+                </div>
+                <div class="card-body">
+                    <form id="videoUploadForm" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="videoFile" class="form-label">Select Video File</label>
+                            <input type="file" class="form-control" id="videoFile" name="video" accept="video/*" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Upload and Analyze</button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Video Preview -->
+            <div class="card mt-3">
+                <div id="upload-loading-bar" class="progress mt-2" style="display: none;">
+                    <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
+                         role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+                
+                <div class="card-header">
+                    <h5>Video Preview</h5>
+                </div>
+                <div class="card-body">
+                    <!-- <video id="videoPreview" class="w-100" controls style="display: none;">
+                        <source src="" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video> -->
+                    <div id="uploaded-video-container" class="video-container">
+                        <p class="text-center text-muted">Upload a video above to see the feed here.</p>
+                    </div>                    
+                    <div id="processingStatus" class="alert alert-info" style="display: none;">
+                        Processing video...
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Critical Events Table -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>Real-Time Events</h5>
+                    <button id="exportBtn" class="btn btn-success" disabled>Export to Excel</button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive" id="table-container">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Time</th>
+                                    <th>Event Type</th>
+                                    <th>Vehicle ID</th>
+                                    <th>Motion Status</th>
+                                    <th>TTC (s)</th>
+                                    <th>Location</th>
+                                    
+                                </tr>
+                            </thead>
+                            
+                            <tbody id="eventsTableBody">
+                                <!-- Events will be populated here -->
+
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,29 @@
+# Ignore Python virtual environment
+venv/
+
+# Ignore compiled Python files
+*.pyc
+__pycache__/
+
+# Ignore editor/IDE files
+.vscode/
+.idea/
+
+# Ignore database file
+events.db
+
+# Ignore uploaded videos and processed output
+uploads/
+
+# Ignore specific model files that might be very large or generated
+*.pkl
+*.onnx
+*.trt
+*.h5
+
+# Ignore any exported files
+exports/
+blockchain_excles/
+
+# Ignore .env file if used for environment variables
+.env 

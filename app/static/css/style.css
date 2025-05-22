@@ -1,0 +1,47 @@
+.border-left-red {
+    border-left: 5px solid #dc3545; /* danger */
+}
+
+.border-left-green {
+    border-left: 5px solid #28a745; /* safe/non-critical */
+}
+
+.border-left-yellow {
+    border-left: 5px solid #ffc107; /* warning */
+}
+
+.border-left-blue {
+    border-left: 5px solid #17a2b8; /* frontier info */
+}
+
+.critical-events-table-compact tbody tr td {
+    padding: 0.3rem;
+}
+
+.custom-row {
+    /* Add any base styles for custom rows here */
+}
+
+.border-red {
+    border-left: 5px solid #dc3545; /* danger */
+}
+
+.border-yellow {
+    border-left: 5px solid #ffc107; /* warning */
+}
+
+.border-blue {
+    border-left: 5px solid #17a2b8; /* frontier info */
+}
+
+
+#table-container {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+  .table th, .table td {
+    font-size: 0.9rem;
+  }
+  
