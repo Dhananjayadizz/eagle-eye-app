@@ -10,26 +10,30 @@
     <!-- Content area for Live Stream and Critical Events Table -->
     <div class="row">
         <div class="col-md-8">
-            <!-- Video Feed will go here -->
-            <h3>Live Video Feed</h3>
-            <p>Live video feed is not currently available. Please use the upload form to analyze videos.</p>
+            <!-- Video Feed -->
+            <!-- <img src="" id="videoFeed" class="img-fluid" alt="Live Feed"> -->
+            <!-- <video id="live-video-container" class="img-fluid" autoplay playsinline muted></video> -->
+            <img id="live-video-container" class="img-fluid" alt="Live Feed">
 
-            <!-- Upload Form -->
+
+
+
+            <!-- Camera Selection Dropdown -->
             <div class="mt-4">
-                <h3>Upload Video</h3>
-                <form id="upload-form" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="videoFile" class="form-label">Select Video File</label>
-                        <input class="form-control" type="file" id="videoFile" name="video">
-                    </div>
-                    <button type="submit" class="btn btn-primary">Upload and Analyze</button>
-                </form>
+                <h3>Select Camera Feed</h3>
+                <div class="mb-3">
+                    <label for="cameraSelect" class="form-label">Select Camera:</label>
+                    <select class="form-select" id="cameraSelect">
+                        <option selected disabled>Detecting cameras...</option>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-success me-2" id="start-camera">Start Camera</button>
+                <button type="button" class="btn btn-danger" id="stop-camera">Stop Camera</button>
             </div>
-
         </div>
 
         <div class="col-md-4">
-            <!-- Critical Events Table will go here -->
+            <!-- Critical Events Table -->
             <h3>Critical Events</h3>
             <button id="export-critical-events-btn" class="btn btn-primary btn-sm mb-3">Export Critical Events</button>
             <div style="max-height: 600px; overflow-y: auto;">
@@ -56,37 +60,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Handle video upload form submission
-        const uploadForm = document.getElementById('upload-form');
-        if (uploadForm) {
-            uploadForm.addEventListener('submit', function(event) {
-                event.preventDefault();
-                const formData = new FormData(uploadForm);
+<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+<script src="{{ url_for('static', filename='js/livestream.js') }}"></script>
 
-                fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        console.log('Video uploaded and processing started.', data.video_path);
-                        // You might want to update the video feed src here if needed
-                        // document.getElementById('videoFeed').src = '/video_feed?t=' + Date.now(); // Add timestamp to prevent caching
-                    } else {
-                        console.error('Upload failed:', data.error);
-                        alert('Upload failed: ' + data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error during upload fetch:', error);
-                    alert('Error during upload.');
-                });
-            });
-        }
-    });
-</script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script> {# Include the main.js for Socket.IO #}
-{% endblock %} 
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

@@ -345,18 +345,54 @@ def process_live_stream(camera_id):
             logging.info("Live stream processing stopped.")
 
 @socketio.on('start_live_processing')
-def handle_live_processing(data):
-    """Handle start of live processing"""
-    device_id = data.get('deviceId')
-    if not device_id:
-        socketio.emit('error', {'message': 'No device ID provided'})
+def handle_start_live_processing(data):
+    logger.info(f"Received start_live_processing signal with data: {data}")
+    cameraIndex = data.get('cameraIndex')
+    if cameraIndex is None:
+        logger.error("No cameraIndex provided in start_live_processing signal")
+        # Emit an error back to the frontend if no index is provided
+        socketio.emit('stream_error', {'error': 'No camera index provided.'})
         return
-    
-    # Start live stream processing in a background thread
-    # Pass the device_id to the processing function
-    threading.Thread(target=process_live_stream, args=(device_id,), daemon=True).start()
-    socketio.emit('status', {'message': f'Started processing for device {device_id}'})
-    logging.info(f"Received start_live_processing request for device {device_id}")
+
+    # Ensure cameraIndex is an integer
+    try:
+        cameraIndex = int(cameraIndex)
+    except ValueError:
+        logger.error(f"Invalid cameraIndex received: {cameraIndex}")
+        # Emit an error back to the frontend for invalid index
+        socketio.emit('stream_error', {'error': f'Invalid camera index received: {cameraIndex}.'})
+        return
+
+    global cap
+    # Attempt to open the camera using the integer index
+    logger.info(f"Attempting to open camera with index: {cameraIndex}")
+    cap = cv2.VideoCapture(cameraIndex) # Use the integer index here
+
+    if not cap.isOpened():
+        logger.error(f"Failed to open camera with index: {cameraIndex}")
+        # Emit an error back to the frontend
+        socketio.emit('stream_error', {'error': f'Failed to open camera with index: {cameraIndex}.'})
+        return
+
+    logger.info(f"Successfully opened camera with index: {cameraIndex}")
+    # Start a new thread for processing and streaming frames
+    global processing_thread
+    if processing_thread is None or not processing_thread.is_alive():
+        # Start live stream processing in a background thread
+        # Pass the camera_id to the processing function (though process_live_stream also uses cap directly)
+        # We should pass the cameraIndex or cap itself if needed in process_live_stream
+        # Let's pass the cameraIndex for consistency, though process_live_stream currently opens cap again
+        # To avoid opening twice, we should pass the opened cap to process_live_stream
+
+        # Let's adjust process_live_stream to accept the opened cap
+        logger.info("Starting live stream processing thread.")
+        # Make sure process_live_stream can accept the cap object or the index to open it internally
+        # Based on its current definition process_live_stream(camera_id), it expects an ID/index to open cap internally.
+        # We will keep passing the cameraIndex and modify process_live_stream to use the passed index.
+
+        threading.Thread(target=process_live_stream, args=(cameraIndex,), daemon=True).start() # Pass the index
+        socketio.emit('status', {'message': f'Started processing for camera index {cameraIndex}'})
+        logging.info(f"Received start_live_processing request for camera index {cameraIndex}")
 
 
 @socketio.on('stop_live_processing')

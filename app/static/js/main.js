@@ -1,4 +1,4 @@
- // main.js
+// main.js
 // Purpose: Entry point - initializes tabs and default settings
 
 document.addEventListener('DOMContentLoaded', () => {
