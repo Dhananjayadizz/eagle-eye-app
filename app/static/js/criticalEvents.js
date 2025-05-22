@@ -5,8 +5,8 @@
 const uploadForm = document.getElementById('videoUploadForm');
 const videoInput = document.getElementById('videoFile');
 const uploadedVideoContainer = document.getElementById('uploaded-video-container'); // Since <video> is your preview
-const uploadLoadingBar = document.getElementById('upload-loading-bar');
-const uploadProgressBar = document.getElementById('upload-progress-bar');
+// const uploadLoadingBar = document.getElementById('upload-loading-bar');
+// const uploadProgressBar = document.getElementById('upload-progress-bar');
 const criticalEventsTable = document.getElementById('eventsTableBody');
 
 

@@ -3,84 +3,69 @@
 {% block title %}Critical Events Analysis{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container">
     <h2>Critical Events Analysis</h2>
     <p>Analyze critical events (Sudden Stops, Loss of Control, TTC) and incidents in real-time.</p>
-    
-    <div class="row mt-4">
-        <!-- Video Upload Section -->
-        <div class="col-md-6">
-            <div class="card">
+
+    <div class="row">
+        <!-- Left Column: Video Display and Upload -->
+        <div class="col-md-8">
+            <!-- Video Display Area -->
+            <div id="uploaded-video-container" class="mt-4 video-container">
+                <p class="text-center text-muted">Upload a video to see the analysis here.</p>
+            </div>
+
+            <!-- Video Upload Form -->
+            <div class="card mt-4">
                 <div class="card-header">
                     <h5>Upload Video</h5>
                 </div>
                 <div class="card-body">
                     <form id="videoUploadForm" enctype="multipart/form-data">
                         <div class="mb-3">
-                            <label for="videoFile" class="form-label">Select Video File</label>
+                            <label for="videoFile" class="form-label">Select Video File:</label>
                             <input type="file" class="form-control" id="videoFile" name="video" accept="video/*" required>
                         </div>
                         <button type="submit" class="btn btn-primary">Upload and Analyze</button>
                     </form>
                 </div>
             </div>
-            
-            <!-- Video Preview -->
-            <div class="card mt-3">
-                <div id="upload-loading-bar" class="progress mt-2" style="display: none;">
-                    <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
-                         role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+
+            <!-- Processing Status Alert -->
+            <div id="processingStatus" class="alert alert-info mt-3" style="display: none;">
+                <div class="d-flex align-items-center">
+                    <div class="spinner-border spinner-border-sm me-2" role="status">
+                        <span class="visually-hidden">Loading...</span>
                     </div>
-                </div>
-                
-                <div class="card-header">
-                    <h5>Video Preview</h5>
-                </div>
-                <div class="card-body">
-                    <!-- <video id="videoPreview" class="w-100" controls style="display: none;">
-                        <source src="" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video> -->
-                    <div id="uploaded-video-container" class="video-container">
-                        <p class="text-center text-muted">Upload a video above to see the feed here.</p>
-                    </div>                    
-                    <div id="processingStatus" class="alert alert-info" style="display: none;">
-                        Processing video...
-                    </div>
+                    <span>Processing video... This may take a few moments.</span>
                 </div>
             </div>
         </div>
-        
-        <!-- Critical Events Table -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5>Real-Time Events</h5>
-                    <button id="exportBtn" class="btn btn-success" disabled>Export to Excel</button>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive" id="table-container">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Time</th>
-                                    <th>Event Type</th>
-                                    <th>Vehicle ID</th>
-                                    <th>Motion Status</th>
-                                    <th>TTC (s)</th>
-                                    <th>Location</th>
-                                    
-                                </tr>
-                            </thead>
-                            
-                            <tbody id="eventsTableBody">
-                                <!-- Events will be populated here -->
 
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+        <!-- Right Column: Critical Events Table -->
+        <div class="col-md-4">
+            <h3 class="mt-4">Real-Time Events</h3>
+            <div class="d-flex gap-2 mb-3">
+                <button id="exportBtn" class="btn btn-primary btn-sm">Export Events</button>
+                <button id="clearFilesBtn" class="btn btn-danger btn-sm">Clear Files</button>
+            </div>
+            <div style="max-height: 600px; overflow-y: auto;">
+                <table class="table table-striped table-hover table-sm critical-events-table-compact">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Time</th>
+                            <th>Event Type</th>
+                            <th>Vehicle ID</th>
+                            <th>Motion Status</th>
+                            <th>TTC (s)</th>
+                            <th>Location</th>
+                        </tr>
+                    </thead>
+                    <tbody id="eventsTableBody">
+                        <!-- Events will be populated here -->
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -93,14 +78,23 @@
 .alert {
     margin-bottom: 0;
 }
+.video-container {
+    width: 100%;
+    min-height: 400px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const videoUploadForm = document.getElementById('videoUploadForm');
-    const videoPreview = document.getElementById('videoPreview');
     const processingStatus = document.getElementById('processingStatus');
     const exportBtn = document.getElementById('exportBtn');
+    const clearFilesBtn = document.getElementById('clearFilesBtn');
     const eventsTableBody = document.getElementById('eventsTableBody');
     
     // Handle video upload
@@ -111,13 +105,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const videoFile = document.getElementById('videoFile').files[0];
         
         if (!videoFile) {
-            alert('Please select a video file');
+            showAlert('Please select a video file', 'warning');
             return;
         }
         
         // Show processing status
         processingStatus.style.display = 'block';
-        // videoPreview.style.display = 'none';
         
         try {
             const response = await fetch('/upload', {
@@ -128,19 +121,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             
             if (data.success) {
-                // Enable export button
+                showAlert('Video uploaded successfully', 'success');
+                displayUploadedVideoFeed();
                 exportBtn.disabled = false;
-                
-                // Show video preview
-                // videoPreview.src = URL.createObjectURL(videoFile);
-                // videoPreview.src = `/uploads/latest_video.mp4?t=${Date.now()}`;
-                // videoPreview.style.display = 'block';
             } else {
-                alert('Error: ' + data.error);
+                showAlert(data.error || 'Failed to upload video', 'danger');
             }
         } catch (error) {
-            alert('Error uploading video: ' + error.message);
+            console.error('Error:', error);
+            showAlert('Error uploading video', 'danger');
         } finally {
+            // Hide processing status
             processingStatus.style.display = 'none';
         }
     });
@@ -151,7 +142,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch('/export_critical_events');
             const blob = await response.blob();
             
-            // Create download link
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -161,7 +151,29 @@ document.addEventListener('DOMContentLoaded', function() {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
         } catch (error) {
-            alert('Error exporting events: ' + error.message);
+            showAlert('Error exporting events: ' + error.message, 'danger');
+        }
+    });
+
+    // Handle clear files button
+    clearFilesBtn.addEventListener('click', async function() {
+        try {
+            const response = await fetch('/clear_files', {
+                method: 'POST'
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                showAlert('Files cleared successfully', 'success');
+                eventsTableBody.innerHTML = '';
+                document.getElementById('uploaded-video-container').innerHTML = 
+                    '<p class="text-center text-muted">Upload a video to see the analysis here.</p>';
+                exportBtn.disabled = true;
+            } else {
+                showAlert('Failed to clear files', 'danger');
+            }
+        } catch (error) {
+            showAlert('Error clearing files: ' + error.message, 'danger');
         }
     });
     
@@ -181,8 +193,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const location = `${event.latitude.toFixed(6)}, ${event.longitude.toFixed(6)}`;
         
         row.innerHTML = `
+            <td>${event.id || 'N/A'}</td>
             <td>${timestamp}</td>
             <td>${event.event_type}</td>
+            <td>${event.vehicle_id}</td>
             <td>${event.motion_status}</td>
             <td>${ttc}</td>
             <td>${location}</td>
@@ -201,6 +215,5 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 <script src="{{ url_for('static', filename='js/criticalEvents.js') }}"></script>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-
 
 {% endblock %} 
