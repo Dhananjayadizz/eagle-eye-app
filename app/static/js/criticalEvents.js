@@ -64,7 +64,7 @@ function updateCriticalEventsTable() {
 
         return `
             <tr>
-                <td>${event.id}</td>
+                
                 <td>${event.timestamp}</td>
                 <td>${event.event_type}</td>
                 <td>${event.vehicle_id}</td>
@@ -145,14 +145,24 @@ socket.on('new_event', (event) => {
         const row = document.createElement('tr');
         let rowClass = 'custom-row';
         
-        // Determine row class based on event type and motion status
-        if (event.motion_status === 'Collided' || event.event_type === 'Near Collision') {
-            rowClass += ' border-red';
+        // Determine left border color class based on event type and motion status
+        if (event.motion_status === 'Collided') {
+            rowClass += ' border-left-red';
+        } else if (event.event_type === 'Near Collision') {
+            rowClass += ' border-left-orange';
+        } else if (event.motion_status === 'Sudden Stop Detected!') {
+            rowClass += ' border-left-yellow';
+        } else if (event.motion_status === 'Harsh Braking') {
+            rowClass += ' border-left-brown';
         } else if (event.event_type && event.event_type.includes('Anomaly')) {
-            rowClass += ' border-yellow';
+            rowClass += ' border-left-blue';
         } else if (event.event_type === 'Frontier') {
-            rowClass += ' border-blue';
+             rowClass += ' border-left-green';
+        } else if (event.event_type === 'Tracked') {
+             rowClass += ' border-left-grey';
         }
+        // Fallback or default can be handled by the base .custom-row style if needed
+
         row.className = rowClass;
         
         // Add event data to row
@@ -166,6 +176,11 @@ socket.on('new_event', (event) => {
             <td>${event.latitude !== undefined && event.longitude !== undefined ? `${parseFloat(event.latitude).toFixed(6)}, ${parseFloat(event.longitude).toFixed(6)}` : 'N/A'}</td>
         `;
         targetTableBody.insertBefore(row, targetTableBody.firstChild);
+
+        // Keep only last 100 events (optional, based on your existing logic)
+        // if (targetTableBody.children.length > 100) {
+        //     targetTableBody.removeChild(targetTableBody.lastChild);
+        // }
     }
 });
 
