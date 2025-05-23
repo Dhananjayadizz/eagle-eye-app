@@ -3,36 +3,90 @@
 {% block title %}Blockchain Store{% endblock %}
 
 {% block content %}
-<div class="text-center">
-    <h1 class="display-4">Blockchain Store</h1>
-    <p class="lead">Secure storage and management of blockchain data</p>
-    <div class="mt-4">
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title">Blockchain Status</h5>
-                        <p class="card-text">Current status of the blockchain network.</p>
-                        <div class="alert alert-info">
-                            Blockchain network is operational
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title">Transaction Statistics</h5>
-                        <p class="card-text">Overview of blockchain transactions.</p>
-                        <ul class="list-group">
-                            <li class="list-group-item">Total Blocks: 1,234</li>
-                            <li class="list-group-item">Pending Transactions: 5</li>
-                            <li class="list-group-item">Network Hash Rate: 45 TH/s</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
+<div class="container mt-4">
+    <h2>Blockchain Store</h2>
+    <div class="mb-3">
+        <label for="blockchain-file-input" class="form-label">Upload File to Blockchain</label>
+        <input class="form-control" type="file" id="blockchain-file-input">
     </div>
+    <button class="btn btn-primary mb-2" id="blockchain-upload-button">Upload to Blockchain</button>
+    <div id="blockchain-upload-status" class="text-muted mb-3"></div>
+    <hr>
+    <h5>Files Stored on Blockchain</h5>
+    <button class="btn btn-secondary mb-2" id="blockchain-refresh-button">Refresh List</button>
+    <div id="blockchain-list-status" class="text-muted mb-2"></div>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>File Name</th>
+                <th>Timestamp</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="blockchain-files-table">
+            <!-- Populated by JS -->
+        </tbody>
+    </table>
 </div>
-{% endblock %} 
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById("blockchain-upload-button").addEventListener("click", async () => {
+    const input = document.getElementById("blockchain-file-input");
+    const file = input.files[0];
+    if (!file) return alert("Please select a file");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const statusDiv = document.getElementById("blockchain-upload-status");
+    statusDiv.innerText = "Uploading...";
+
+    try {
+        const res = await fetch("/blockchain/store", {
+            method: "POST",
+            body: formData
+        });
+
+        const result = await res.json();
+        statusDiv.innerText = result.message || result.error;
+
+        // Refresh list
+        document.getElementById("blockchain-refresh-button").click();
+    } catch (err) {
+        statusDiv.innerText = "Upload failed: " + err.message;
+    }
+});
+
+document.getElementById("blockchain-refresh-button").addEventListener("click", async () => {
+    const table = document.getElementById("blockchain-files-table");
+    const statusDiv = document.getElementById("blockchain-list-status");
+    statusDiv.innerText = "Refreshing...";
+    table.innerHTML = "";
+
+    try {
+        const res = await fetch("/blockchain/list");
+        const data = await res.json();
+        if (!data.files.length) {
+            statusDiv.innerText = "No files stored.";
+            return;
+        }
+
+        for (let file of data.files) {
+            const row = `<tr>
+                <td>${file.id}</td>
+                <td>${file.file_name}</td>
+                <td>${new Date(file.timestamp).toLocaleString()}</td>
+                <td><a href="/blockchain/retrieve/${file.id}" class="btn btn-sm btn-primary">Download</a></td>
+            </tr>`;
+            table.innerHTML += row;
+        }
+        statusDiv.innerText = "✅ Refreshed.";
+    } catch (err) {
+        statusDiv.innerText = "Error fetching files: " + err.message;
+    }
+});
+</script>
+{% endblock %}
