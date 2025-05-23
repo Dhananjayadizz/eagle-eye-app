@@ -1,4 +1,4 @@
-// Updated livestream.js with loading effect
+// Optimized livestream.js for near real-time performance
 const socket = io();
 
 const cameraSource = document.getElementById('cameraSelect');
@@ -7,12 +7,18 @@ const stopCameraButton = document.getElementById('stop-camera');
 const liveVideoContainer = document.getElementById('live-video-container');
 const processedImg = document.getElementById('processed-video-feed');
 const loadingIndicator = document.getElementById('video-loading-indicator');
+const qualitySelector = document.getElementById('quality-selector');
+const fpsSelector = document.getElementById('fps-selector');
 
 let stream = null;
 let video = null;
 let isProcessing = false;
 let frameReceived = false;
 let loadingTimeout = null;
+let lastFrameTime = 0;
+let frameInterval = 100; // Default 10 FPS (100ms)
+let frameQuality = 0.5; // Default medium quality
+let frameResolution = { width: 640, height: 480 }; // Default medium resolution
 
 // Show loading indicator
 function showLoading() {
@@ -39,9 +45,41 @@ function setLoadingTimeout() {
     clearTimeout(loadingTimeout);
     loadingTimeout = setTimeout(() => {
         if (!frameReceived && isProcessing) {
-            showAlert('Video processing is taking longer than expected. Please be patient or try again.', 'warning');
+            showAlert('Video processing is taking longer than expected. Try reducing quality or frame rate.', 'warning');
         }
     }, 10000); // Show warning after 10 seconds if no frames received
+}
+
+// Update frame settings based on user selections
+function updateFrameSettings() {
+    // Update frame rate
+    if (fpsSelector) {
+        const fps = parseInt(fpsSelector.value);
+        frameInterval = Math.floor(1000 / fps);
+    }
+    
+    // Update quality
+    if (qualitySelector) {
+        const quality = qualitySelector.value;
+        switch(quality) {
+            case 'low':
+                frameQuality = 0.3;
+                frameResolution = { width: 320, height: 240 };
+                break;
+            case 'medium':
+                frameQuality = 0.5;
+                frameResolution = { width: 640, height: 480 };
+                break;
+            case 'high':
+                frameQuality = 0.7;
+                frameResolution = { width: 1280, height: 720 };
+                break;
+        }
+    }
+    
+    if (isProcessing) {
+        showAlert(`Settings updated: ${frameResolution.width}x${frameResolution.height} at ${Math.floor(1000/frameInterval)} FPS`, 'info');
+    }
 }
 
 // Populate camera options
@@ -78,6 +116,9 @@ async function startCamera() {
     }
 
     try {
+        // Update frame settings before starting
+        updateFrameSettings();
+        
         // Show loading indicator before starting camera
         showLoading();
         isProcessing = true;
@@ -87,8 +128,8 @@ async function startCamera() {
         stream = await navigator.mediaDevices.getUserMedia({
             video: {
                 deviceId: { exact: selectedDeviceId },
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
+                width: { ideal: frameResolution.width },
+                height: { ideal: frameResolution.height }
             }
         });
         
@@ -103,14 +144,23 @@ async function startCamera() {
 
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
+        canvas.width = frameResolution.width;
+        canvas.height = frameResolution.height;
 
         video.addEventListener('play', () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-
             function sendFrame() {
                 if (video.paused || video.ended || !isProcessing) return;
-
+                
+                // Throttle frame rate
+                const now = Date.now();
+                if (now - lastFrameTime < frameInterval) {
+                    setTimeout(sendFrame, 5); // Check again soon
+                    return;
+                }
+                
+                lastFrameTime = now;
+                
+                // Draw at the specified resolution
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
                 canvas.toBlob(blob => {
@@ -119,9 +169,9 @@ async function startCamera() {
                         socket.emit('client_frame', reader.result);
                     };
                     reader.readAsDataURL(blob);
-                }, 'image/jpeg', 0.7);
+                }, 'image/jpeg', frameQuality);
 
-                setTimeout(sendFrame, 33); // ~30 FPS
+                setTimeout(sendFrame, 5); // Schedule next frame check
             }
 
             sendFrame();
@@ -130,9 +180,16 @@ async function startCamera() {
         startCameraButton.disabled = true;
         stopCameraButton.disabled = false;
         cameraSource.disabled = true;
+        
+        if (qualitySelector) qualitySelector.disabled = false;
+        if (fpsSelector) fpsSelector.disabled = false;
 
         // Notify server to start processing with the selected camera
-        socket.emit('start_live_processing', { cameraIndex: 0 }); // Use 0 for default camera index
+        socket.emit('start_live_processing', { 
+            cameraIndex: 0,
+            quality: qualitySelector ? qualitySelector.value : 'medium',
+            fps: fpsSelector ? parseInt(fpsSelector.value) : 10
+        });
         
         showAlert('Camera started. Processing video stream...', 'info');
 
@@ -163,6 +220,9 @@ function stopCamera() {
     startCameraButton.disabled = false;
     stopCameraButton.disabled = true;
     cameraSource.disabled = false;
+    
+    if (qualitySelector) qualitySelector.disabled = true;
+    if (fpsSelector) fpsSelector.disabled = true;
     
     socket.emit('stop_live_processing');
     
@@ -241,11 +301,21 @@ socket.on('disconnect', (reason) => {
 // Event listeners
 startCameraButton.addEventListener('click', startCamera);
 stopCameraButton.addEventListener('click', stopCamera);
+if (qualitySelector) {
+    qualitySelector.addEventListener('change', updateFrameSettings);
+}
+if (fpsSelector) {
+    fpsSelector.addEventListener('change', updateFrameSettings);
+}
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     populateCameraOptions();
     stopCameraButton.disabled = true;
+    
+    // Disable quality and FPS selectors until camera starts
+    if (qualitySelector) qualitySelector.disabled = true;
+    if (fpsSelector) fpsSelector.disabled = true;
     
     // Set default placeholder image
     if (processedImg && !processedImg.src) {
