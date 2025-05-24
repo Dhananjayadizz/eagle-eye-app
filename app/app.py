@@ -101,7 +101,9 @@ def create_app():
 #         logger.error(f"Error clearing exports directory on startup: {e}")
 
 
+
 app = create_app()
+
 
 if __name__ == '__main__':
     with app.app_context():

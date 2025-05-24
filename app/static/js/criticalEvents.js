@@ -428,4 +428,3 @@ function displayUploadedVideoFeed() {
 //     uploadedVideoContainer.appendChild(video);
 // }
 
-

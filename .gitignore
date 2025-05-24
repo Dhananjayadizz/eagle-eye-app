@@ -14,12 +14,14 @@ events.db
 
 # Ignore uploaded videos and processed output
 uploads/
+app/static/processed_video/processed_video.mp4
 
 # Ignore specific model files that might be very large or generated
 *.pkl
 *.onnx
 *.trt
 *.h5
+*.pt
 
 # Ignore any exported files
 exports/

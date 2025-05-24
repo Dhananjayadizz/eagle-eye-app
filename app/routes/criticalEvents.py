@@ -98,6 +98,9 @@ CURRENT_VIDEO_FILE = "current_video.mp4"
 
 # Initialize YOLO model
 model = YOLO('yolov8n.pt')
+# Load lane detection model once globally
+lane_model = YOLO("app/models/lane_detection_model.pt").to(device)
+
 
 
 
@@ -441,16 +444,7 @@ def process_video_with_context(app, video_path):
     """Wrapper function to provide application context for video processing"""
     process_video(video_path)
 
-# Modify the video_feed route to use the current video
-# @critical_events_bp.route("/video_feed")
-# def video_feed():
-#     video_path = os.path.join(app.config["UPLOAD_FOLDER"], CURRENT_VIDEO_FILE)
-#     if not os.path.exists(video_path):
-#         return jsonify({'error': 'No video available'}), 404
-        
-#     logger.info(f"Starting video feed for: {video_path}")
-#     return Response(process_video(video_path),
-#                     mimetype="multipart/x-mixed-replace; boundary=frame")
+
 
 from flask import stream_with_context
 
@@ -468,84 +462,6 @@ def video_feed():
                     mimetype="multipart/x-mixed-replace; boundary=frame")
 
 
-# def process_video(video_path):
-#     cap = None
-#     try:
-#         cap = cv2.VideoCapture(video_path)
-#         frame_count = 0
-#         prev_frame = None
-        
-#         while cap.isOpened():
-#             ret, frame = cap.read()
-#             if not ret:
-#                 break
-            
-#             frame_count += 1
-            
-#             # Resize frame for processing
-#             frame = cv2.resize(frame, (640, 480))
-            
-#             # Get GPS data
-#             gps = get_gps_data()
-            
-#             # Detect motion changes
-#             motion_status = detect_motion_changes(prev_frame, frame) if prev_frame is not None else "Normal Motion"
-            
-#             # Perform object detection
-#             results = model(frame)
-            
-#             # Process detections
-#             for result in results:
-#                 boxes = result.boxes
-#                 for box in boxes:
-#                     x1, y1, x2, y2 = map(int, box.xyxy[0])
-#                     conf = float(box.conf[0])
-#                     cls = int(box.cls[0])
-                    
-#                     if conf > 0.5:  # Confidence threshold
-#                         # Calculate TTC
-#                         ttc = calculate_ttc(ego_speed=40.0,  # Placeholder ego speed
-#                                          frontier_speed=estimate_frontier_speed(track_id=cls,
-#                                                                               y_center=(y1 + y2) / 2,
-#                                                                               frame_count=frame_count,
-#                                                                               frame_time=frame_count/30),
-#                                          distance=calculate_distance(x1, y1, x2, y2))
-                        
-#                         # Create event log
-#                         event = EventLog(
-#                             vehicle_id=cls,
-#                             event_type="Vehicle Detected",
-#                             x1=x1, y1=y1, x2=x2, y2=y2,
-#                             ttc=ttc,
-#                             latitude=gps["latitude"],
-#                             longitude=gps["longitude"],
-#                             motion_status=motion_status
-#                         )
-                        
-#                         db.session.add(event)
-                        
-#                         # Emit event through socket
-#                         socketio.emit('new_event', event.to_dict())
-            
-#             # Commit to database every 30 frames
-#             if frame_count % 30 == 0:
-#                 try:
-#                     db.session.commit()
-#                 except Exception as e:
-#                     logger.error(f"Commit failed: {e}")
-            
-#             prev_frame = frame.copy()
-            
-#     except Exception as e:
-#         logger.error(f"Error processing video: {str(e)}")
-#     finally:
-#         if cap is not None:
-#             cap.release()
-#         try:
-#             if os.path.exists(video_path):
-#                 os.remove(video_path)
-#         except Exception as e:
-#             logger.error(f"Error removing video file: {str(e)}")
 
 # def process_video(video_path):
 #     cap = cv2.VideoCapture(video_path)
@@ -559,6 +475,7 @@ def video_feed():
 #     frame_count = 0
 #     prev_frame = None
 #     prev_tracks = {}
+#     event_counter = 0  # For SocketIO event IDs
 
 #     try:
 #         while cap.isOpened():
@@ -569,206 +486,41 @@ def video_feed():
 
 #             frame_count += 1
 #             if frame_count % 2 == 0:
-#                 continue
+#                 continue  # Skip every other frame to reduce load
 
 #             frame = cv2.resize(frame, (640, 480))
 #             height, width = frame.shape[:2]
 
-#             # Draw ego lane
+#             # --- Lane detection and drawing with fallback ---
 #             lane_lines = detect_lanes(frame)
-#             left_lane_x, right_lane_x, _, _ = get_ego_lane_bounds(lane_lines, width, height)
+#             left_lane_x, right_lane_x, left_points, right_points = get_ego_lane_bounds(lane_lines, width, height)
 
-#             for x1, y1, x2, y2 in lane_lines:
-#                 cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+#             if not lane_lines or (left_points is None and right_points is None):
+#                 # Fallback: draw red polygon if no lanes detected
+#                 roi_vertices = np.array([[  
+#                     [int(width * 0.1), int(height * 0.9)],
+#                     [int(width * 0.4), int(height * 0.55)],
+#                     [int(width * 0.6), int(height * 0.55)],
+#                     [int(width * 0.9), int(height * 0.9)]
+#                 ]], np.int32)
+#                 cv2.polylines(frame, roi_vertices, isClosed=True, color=(0, 0, 255), thickness=1)
+#                 logger.warning("No lane lines detected; drawing fallback ROI polygon")
+#             else:
+#                 # Draw detected lane lines (green)
+#                 for x1, y1, x2, y2 in lane_lines:
+#                     cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 1)
 
-#             # Draw ego lane bounds
-#             cv2.line(frame, (left_lane_x, height), (left_lane_x, int(height * 0.6)), (0, 0, 255), 2)
-#             cv2.line(frame, (right_lane_x, height), (right_lane_x, int(height * 0.6)), (0, 0, 255), 2)
+#                 # Draw left lane boundary lines (blue)
+#                 if left_points:
+#                     for x1, y1, x2, y2 in left_points:
+#                         cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 0), 1)
+#                         logger.debug(f"Drawing left lane boundary line: ({x1},{y1}) to ({x2},{y2})")
 
-#             gps = get_gps_data()
-#             ego_speed = gps["speed"]
-#             motion_status = detect_motion_changes(prev_frame, frame) if prev_frame is not None else "Normal Motion"
-#             prev_frame = frame.copy()
-
-#             ego_speed_gps = calculate_speed_from_gps(ego_gps_history, gps["latitude"], gps["longitude"], frame_count, FRAME_TIME)
-#             draw_speedometer(frame, ego_speed_gps, width - 80, height - 80, radius=50)
-
-#             results = model(frame)[0]
-#             detections = [[int(b.xyxy[0][0]), int(b.xyxy[0][1]), int(b.xyxy[0][2]), int(b.xyxy[0][3])]
-#                           for b in results.boxes if int(b.cls[0]) in [2, 3, 5, 7]]
-#             tracked_objects = tracker.update(np.array(detections) if detections else np.empty((0, 4)))
-
-#             test_data = []
-#             for t in tracked_objects:
-#                 if len(t) >= 5:
-#                     x1, y1, x2, y2, tid = map(int, t)
-#                     cx = (x1 + x2) // 2
-#                     cy = y2
-#                     w = x2 - x1
-#                     h = y2 - y1
-#                     dist = height - y2
-#                     in_lane = 1 if left_lane_x <= cx <= right_lane_x else 0
-#                     rel_x = (cx - left_lane_x) / (right_lane_x - left_lane_x) if right_lane_x > left_lane_x else 0.5
-#                     test_data.append([x1, y1, x2, y2, cx, cy, w, h, dist, in_lane, rel_x])
-
-#             predictions = frontier_clf.predict(test_data) if test_data else []
-#             frontier_idx = np.argmax(predictions) if np.any(predictions) else -1
-#             frontier_vehicle = tracked_objects[frontier_idx] if 0 <= frontier_idx < len(tracked_objects) else None
-
-#             for t in tracked_objects:
-#                 if len(t) < 5:
-#                     continue
-#                 x1, y1, x2, y2, tid = map(int, t)
-#                 cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-#                 color = (255, 0, 0)
-#                 event_type = "Tracked"
-#                 motion = "Normal Motion" if motion_status == "Normal Motion" else motion_status
-#                 ttc, frontier_speed = None, 0
-#                 is_critical_event = False
-
-#                 if np.array_equal(t, frontier_vehicle):
-#                     color = (0, 255, 0)
-#                     event_type = "Frontier"
-#                     frontier_speed = estimate_frontier_speed(tid, cy, frame_count, FRAME_TIME)
-#                     distance = height - y2
-#                     ttc = calculate_ttc(ego_speed, frontier_speed, distance)
-#                     if ttc < 2:
-#                         event_type = "Near Collision"
-#                     pred_x, pred_y = kalman_tracker.predict_next_position(cx, cy)
-#                     cv2.circle(frame, (pred_x, pred_y), 5, (0, 255, 0), -1)
-
-#                     # Anomaly detection
-#                     features = pd.DataFrame([[frontier_speed, 0, 0]], columns=["v_Vel", "v_Acc", "Lane_ID"])
-#                     scaled = scaler.transform(features)
-#                     if anomaly_model.predict(scaled)[0] == -1:
-#                         event_type += " - Anomaly"
-
-#                     # Motion check
-#                     if tid in prev_tracks:
-#                         dx = np.linalg.norm(np.subtract((cx, cy), prev_tracks[tid]))
-#                         if dx < 0.5:
-#                             motion = "Sudden Stop Detected!"
-#                         elif dx > 5.0:
-#                             motion = "Harsh Braking"
-#                     prev_tracks[tid] = (cx, cy)
-
-#                     # Collision detection
-#                     is_collision = any(
-#                         calculate_iou([x1, y1, x2, y2], [int(o[0]), int(o[1]), int(o[2]), int(o[3])]) > 0.5
-#                         for o in tracked_objects if not np.array_equal(o, t) and len(o) >= 5
-#                     )
-#                     if is_collision:
-#                         motion = "Collided"
-
-#                     is_critical_event = motion in ["Collided", "Sudden Stop Detected!", "Harsh Braking"] or "Anomaly" in event_type or "Collision" in event_type
-
-#                 # Labels
-#                 font = cv2.FONT_HERSHEY_SIMPLEX
-#                 fs = 0.4
-#                 th = 1
-#                 pad = 3
-#                 spacing = 15
-#                 motion_text = f"Motion: {motion}"
-#                 speed_text = f"Speed: {frontier_speed:.1f} km/h" if frontier_speed else "Speed: N/A"
-#                 ttc_text = f"TTC: {ttc:.1f}s" if ttc and ttc != float('inf') else "TTC: N/A"
-#                 id_text = f"ID: {tid}"
-
-
-#                 labels = [motion_text, speed_text, ttc_text, id_text]
-#                 label_positions = [(x1, y1 - 80 + spacing * i) for i in range(len(labels))]
-
-#                 overlay = frame.copy()
-#                 for i, (text, pos) in enumerate(zip(labels, label_positions)):
-#                     (tw, tht), _ = cv2.getTextSize(text, font, fs, th)
-#                     bg_pos1 = (pos[0] - pad, pos[1] - tht - pad)
-#                     bg_pos2 = (pos[0] + tw + pad, pos[1] + pad)
-#                     bg_color = (0, 0, 255) if is_critical_event else (0, 0, 0)
-#                     cv2.rectangle(overlay, bg_pos1, bg_pos2, bg_color, -1)
-#                     cv2.putText(overlay, text, pos, font, fs, (255, 255, 255), th)
-
-#                 cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
-#                 cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-
-#                 # Log and emit
-#                 event = EventLog(vehicle_id=tid, event_type=event_type,
-#                                  x1=x1, y1=y1, x2=x2, y2=y2, ttc=None if ttc == float("inf") else ttc,
-#                                  latitude=gps["latitude"], longitude=gps["longitude"],
-#                                  motion_status=motion)
-#                 if is_critical_event:
-#                     logger.info(f"Critical event detected: {event_type} for vehicle ID {tid} with motion status {motion}")
-#                     db.session.add(event)
-
-#                     # Only emit critical events
-#                 try:
-#                     event_data = {
-#                         "id": event.id,
-#                         "vehicle_id": tid,
-#                         "event_type": event_type,
-#                         "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-#                         "x1": x1, "y1": y1, "x2": x2, "y2": y2,
-#                         "ttc": "N/A" if not ttc or ttc == float("inf") else round(ttc, 2),
-#                         "latitude": gps["latitude"], "longitude": gps["longitude"],
-#                         "motion_status": motion,
-#                         "is_critical": is_critical_event
-#                     }
-#                     logger.debug(f"Emitting event for vehicle ID {tid} (Critical: {is_critical_event})")
-#                     socketio.emit("new_event", event_data)
-#                     logger.info(f"Emitted event data: {event_data}")
-#                 except Exception as e:
-#                     logger.error(f"Socket emit error: {e}")
-
-#             if frame_count % 30 == 0:
-#                 try:
-#                     db.session.commit()
-#                 except Exception as e:
-#                     logger.error(f"Commit failed: {e}")
-
-#             success, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
-#             if success:
-#                 yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-
-#     except Exception as e:
-#         logger.error(f"process_video crashed: {e}")
-#     finally:
-#         cap.release()
-
-
-# def process_video(video_path):
-#     cap = cv2.VideoCapture(video_path)
-#     if not cap.isOpened():
-#         logger.error(f"Failed to open video: {video_path}")
-#         yield b'--frame\r\nContent-Type: image/jpeg\r\n\r\n\r\n'
-#         return
-
-#     FPS = cap.get(cv2.CAP_PROP_FPS)
-#     FRAME_TIME = 1 / FPS
-#     frame_count = 0
-#     prev_frame = None
-#     prev_tracks = {}
-#     event_counter = 0 # Initialize event counter for SocketIO emissions
-
-#     try:
-#         while cap.isOpened():
-#             success, frame = cap.read()
-#             if not success:
-#                 logger.info("End of video stream reached")
-#                 break
-
-#             frame_count += 1
-#             if frame_count % 2 == 0:
-#                 continue
-
-#             frame = cv2.resize(frame, (640, 480))
-#             height, width = frame.shape[:2]
-
-#             lane_lines = detect_lanes(frame)
-#             left_lane_x, right_lane_x, _, _ = get_ego_lane_bounds(lane_lines, width, height)
-
-#             for x1, y1, x2, y2 in lane_lines:
-#                 cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-#             # cv2.line(frame, (left_lane_x, height), (left_lane_x, int(height * 0.6)), (0, 0, 255), 2)
-#             # cv2.line(frame, (right_lane_x, height), (right_lane_x, int(height * 0.6)), (0, 0, 255), 2)
+#                 # Draw right lane boundary lines (red)
+#                 if right_points:
+#                     for x1, y1, x2, y2 in right_points:
+#                         cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 1)
+#                         logger.debug(f"Drawing right lane boundary line: ({x1},{y1}) to ({x2},{y2})")
 
 #             gps = get_gps_data()
 #             ego_speed = gps["speed"]
@@ -867,7 +619,7 @@ def video_feed():
 #                     cv2.putText(overlay, text, pos, font, fs, (255, 255, 255), th)
 
 #                 cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
-#                 cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+#                 cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1)
 
 #                 event = EventLog(vehicle_id=tid, event_type=event_type,
 #                                  x1=x1, y1=y1, x2=x2, y2=y2, ttc=None if ttc == float("inf") else ttc,
@@ -876,12 +628,12 @@ def video_feed():
 
 #                 if is_critical_event:
 #                     db.session.add(event)
-#                     db.session.flush() # Assigns an ID without committing the transaction
+#                     db.session.flush()  # Assigns an ID without committing the transaction
 
 #                 try:
-#                     event_counter += 1 # Increment counter for each emitted event
+#                     event_counter += 1  # Increment counter for each emitted event
 #                     event_data = {
-#                         "id": event_counter, # Use the counter-based ID for SocketIO
+#                         "id": event_counter,  # Use the counter-based ID for SocketIO
 #                         "vehicle_id": tid,
 #                         "event_type": event_type,
 #                         "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
@@ -912,7 +664,6 @@ def video_feed():
 #     finally:
 #         cap.release()
 
-
 def process_video(video_path):
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -925,7 +676,82 @@ def process_video(video_path):
     frame_count = 0
     prev_frame = None
     prev_tracks = {}
-    event_counter = 0  # For SocketIO event IDs
+    event_counter = 0
+
+    # Define colors and styles
+    VEHICLE_COLOR = (255, 105, 180)  # Pink for vehicles
+    VEHICLE_LABEL_BG = (255, 105, 180)  # Pink background for vehicle labels
+    LANE_COLORS = {
+        0: (0, 255, 255),  # LNL - Cyan
+        1: (255, 255, 0),  # RNL - Yellow 
+        2: (0, 165, 255),  # LFL - Orange
+        3: (255, 0, 255)   # RFL - Magenta
+    }
+    LANE_LABEL_BG = (0, 255, 255)  # Cyan background for lane labels
+    
+    # Colors for other object classes
+    OBJECT_COLORS = {
+        4: (255, 0, 0),    # bus - blue
+        5: (255, 0, 0),    # car - blue
+        6: (255, 0, 0),    # motor - blue
+        7: (0, 0, 255),    # person - red
+        8: (0, 0, 255),    # rider - red
+        9: (0, 255, 0),    # tl_green - green
+        10: (200, 200, 200),  # tl_none - gray
+        11: (0, 0, 255),   # tl_red - red
+        12: (0, 0, 255),   # tl_red_left - red
+        13: (0, 0, 255),   # tl_red_right - red
+        14: (0, 255, 255), # tl_yellow - yellow
+        15: (255, 0, 0)    # truck - blue
+    }
+    
+    OBJECT_LABEL_BG = {
+        4: (200, 200, 255),  # bus - light blue
+        5: (200, 200, 255),  # car - light blue
+        6: (200, 200, 255),  # motor - light blue
+        7: (200, 200, 255),  # person - light red
+        8: (200, 200, 255),  # rider - light red
+        9: (200, 255, 200),  # tl_green - light green
+        10: (230, 230, 230), # tl_none - light gray
+        11: (200, 200, 255), # tl_red - light red
+        12: (200, 200, 255), # tl_red_left - light red
+        13: (200, 200, 255), # tl_red_right - light red
+        14: (200, 255, 255), # tl_yellow - light yellow
+        15: (200, 200, 255)  # truck - light blue
+    }
+    
+    OBJECT_NAMES = {
+        4: 'bus',
+        5: 'car',
+        6: 'motor',
+        7: 'person',
+        8: 'rider',
+        9: 'tl_green',
+        10: 'tl_none',
+        11: 'tl_red',
+        12: 'tl_red_left',
+        13: 'tl_red_right',
+        14: 'tl_yellow',
+        15: 'truck'
+    }
+
+    FONT = cv2.FONT_HERSHEY_SIMPLEX
+    FONT_SCALE = 0.5
+    FONT_THICKNESS = 1
+    BOX_THICKNESS = 2
+
+    # Lane class names
+    lane_class_names = {
+        0: 'LNL',  # Left Near Lane
+        1: 'RNL',  # Right Near Lane
+        2: 'LFL',  # Left Far Lane
+        3: 'RFL'   # Right Far Lane
+    }
+
+    def get_text_color(bg_color):
+        """Determine text color (black or white) based on background brightness"""
+        brightness = (bg_color[0] * 0.299 + bg_color[1] * 0.587 + bg_color[2] * 0.114)
+        return (0, 0, 0) if brightness > 150 else (255, 255, 255)  # Black or white
 
     try:
         while cap.isOpened():
@@ -941,37 +767,80 @@ def process_video(video_path):
             frame = cv2.resize(frame, (640, 480))
             height, width = frame.shape[:2]
 
-            # --- Lane detection and drawing with fallback ---
-            lane_lines = detect_lanes(frame)
-            left_lane_x, right_lane_x, left_points, right_points = get_ego_lane_bounds(lane_lines, width, height)
+            # --- Object detection ---
+            results = lane_model(frame)[0]  # Using the combined model
+            annotated_frame = frame.copy()
 
-            if not lane_lines or (left_points is None and right_points is None):
-                # Fallback: draw red polygon if no lanes detected
-                roi_vertices = np.array([[  
-                    [int(width * 0.1), int(height * 0.9)],
-                    [int(width * 0.4), int(height * 0.55)],
-                    [int(width * 0.6), int(height * 0.55)],
-                    [int(width * 0.9), int(height * 0.9)]
-                ]], np.int32)
-                cv2.polylines(frame, roi_vertices, isClosed=True, color=(0, 0, 255), thickness=1)
-                logger.warning("No lane lines detected; drawing fallback ROI polygon")
-            else:
-                # Draw detected lane lines (green)
-                for x1, y1, x2, y2 in lane_lines:
-                    cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 1)
+            # Process all detections
+            for box in results.boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                class_id = int(box.cls[0])
+                confidence = box.conf[0].item()
+                
+                # Skip low confidence detections
+                if confidence < 0.5:
+                    continue
+                
+                # Handle lane detections (class IDs 0-3)
+                if class_id in lane_class_names:
+                    color = LANE_COLORS.get(class_id, (0, 255, 255))
+                    label = lane_class_names[class_id]
+                    label_bg = LANE_LABEL_BG
+                    
+                    # Draw lane bounding box
+                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, BOX_THICKNESS)
+                    
+                    # Prepare lane label with confidence
+                    label_text = f"{label} {confidence:.2f}"
+                    (text_width, text_height), _ = cv2.getTextSize(label_text, FONT, FONT_SCALE, FONT_THICKNESS)
+                    text_color = get_text_color(label_bg)
+                    
+                    # Draw label background
+                    cv2.rectangle(
+                        annotated_frame,
+                        (x1, y1 - text_height - 5),
+                        (x1 + text_width, y1),
+                        label_bg, -1
+                    )
+                    # Draw label text
+                    cv2.putText(
+                        annotated_frame, label_text,
+                        (x1, y1 - 5),
+                        FONT, FONT_SCALE, text_color, FONT_THICKNESS
+                    )
+                
+                # Handle other object detections (class IDs 4-15)
+                elif class_id in OBJECT_NAMES:
+                    color = OBJECT_COLORS.get(class_id, (255, 255, 255))
+                    label = OBJECT_NAMES[class_id]
+                    label_bg = OBJECT_LABEL_BG.get(class_id, (200, 200, 200))
+                    
+                    # Draw object bounding box
+                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, BOX_THICKNESS)
+                    
+                    # Prepare object label with confidence
+                    label_text = f"{label} {confidence:.2f}"
+                    (text_width, text_height), _ = cv2.getTextSize(label_text, FONT, FONT_SCALE, FONT_THICKNESS)
+                    text_color = get_text_color(label_bg)
+                    
+                    # Draw label background
+                    cv2.rectangle(
+                        annotated_frame,
+                        (x1, y1 - text_height - 5),
+                        (x1 + text_width, y1),
+                        label_bg, -1
+                    )
+                    # Draw label text
+                    cv2.putText(
+                        annotated_frame, label_text,
+                        (x1, y1 - 5),
+                        FONT, FONT_SCALE, text_color, FONT_THICKNESS
+                    )
 
-                # Draw left lane boundary lines (blue)
-                if left_points:
-                    for x1, y1, x2, y2 in left_points:
-                        cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 0), 1)
-                        logger.debug(f"Drawing left lane boundary line: ({x1},{y1}) to ({x2},{y2})")
+            # Use annotated frame for vehicle tracking
+            frame = annotated_frame
 
-                # Draw right lane boundary lines (red)
-                if right_points:
-                    for x1, y1, x2, y2 in right_points:
-                        cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 1)
-                        logger.debug(f"Drawing right lane boundary line: ({x1},{y1}) to ({x2},{y2})")
-
+            # --- Vehicle detection and tracking ---
             gps = get_gps_data()
             ego_speed = gps["speed"]
             motion_status = detect_motion_changes(prev_frame, frame) if prev_frame is not None else "Normal Motion"
@@ -980,10 +849,11 @@ def process_video(video_path):
             ego_speed_gps = calculate_speed_from_gps(ego_gps_history, gps["latitude"], gps["longitude"], frame_count, FRAME_TIME)
             draw_speedometer(frame, ego_speed_gps, width - 80, height - 80, radius=50)
 
-            results = model(frame)[0]
-            detections = [[int(b.xyxy[0][0]), int(b.xyxy[0][1]), int(b.xyxy[0][2]), int(b.xyxy[0][3])]
-                          for b in results.boxes if int(b.cls[0]) in [2, 3, 5, 7]]
-            tracked_objects = tracker.update(np.array(detections) if detections else np.empty((0, 4)))
+            # Filter detections for vehicle classes (car, bus, truck, motor)
+            vehicle_detections = [[int(b.xyxy[0][0]), int(b.xyxy[0][1]), int(b.xyxy[0][2]), int(b.xyxy[0][3])]
+                              for b in results.boxes if int(b.cls[0]) in [5, 4, 15, 6]]  # car, bus, truck, motor
+
+            tracked_objects = tracker.update(np.array(vehicle_detections) if vehicle_detections else np.empty((0, 4)))
 
             test_data = []
             for t in tracked_objects:
@@ -994,8 +864,8 @@ def process_video(video_path):
                     w = x2 - x1
                     h = y2 - y1
                     dist = height - y2
-                    in_lane = 1 if left_lane_x <= cx <= right_lane_x else 0
-                    rel_x = (cx - left_lane_x) / (right_lane_x - left_lane_x) if right_lane_x > left_lane_x else 0.5
+                    in_lane = 1  # You may add better lane-in logic if needed
+                    rel_x = 0.5
                     test_data.append([x1, y1, x2, y2, cx, cy, w, h, dist, in_lane, rel_x])
 
             predictions = frontier_clf.predict(test_data) if test_data else []
@@ -1007,14 +877,16 @@ def process_video(video_path):
                     continue
                 x1, y1, x2, y2, tid = map(int, t)
                 cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-                color = (255, 0, 0)
+                
+                # Set vehicle color and properties
+                color = VEHICLE_COLOR
                 event_type = "Tracked"
                 motion = "Normal Motion" if motion_status == "Normal Motion" else motion_status
                 ttc, frontier_speed = None, 0
                 is_critical_event = False
 
                 if np.array_equal(t, frontier_vehicle):
-                    color = (0, 255, 0)
+                    color = (0, 255, 0)  # Green box for frontier
                     event_type = "Frontier"
                     frontier_speed = estimate_frontier_speed(tid, cy, frame_count, FRAME_TIME)
                     distance = height - y2
@@ -1046,56 +918,95 @@ def process_video(video_path):
 
                     is_critical_event = motion in ["Collided", "Sudden Stop Detected!", "Harsh Braking"] or "Anomaly" in event_type
 
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                fs = 0.4
-                th = 1
-                pad = 3
-                spacing = 15
+                # Draw vehicle bounding box
+                cv2.rectangle(frame, (x1, y1), (x2, y2), color, BOX_THICKNESS)
+                
+                # Determine text color based on vehicle label background
+                text_color = get_text_color(VEHICLE_LABEL_BG)
+                
+                # Prepare vehicle label
+                label_text = f"Car {tid}"
+                if frontier_speed > 0:
+                    label_text += f" {frontier_speed:.1f}km/h"
+                
+                (text_width, text_height), _ = cv2.getTextSize(label_text, FONT, FONT_SCALE, FONT_THICKNESS)
+                
+                # Draw label background
+                cv2.rectangle(
+                    frame,
+                    (x1, y1 - text_height - 5),
+                    (x1 + text_width, y1),
+                    VEHICLE_LABEL_BG, -1
+                )
+                # Draw label text with appropriate color
+                cv2.putText(
+                    frame, label_text,
+                    (x1, y1 - 5),
+                    FONT, FONT_SCALE, text_color, FONT_THICKNESS
+                )
+
+                # Prepare additional info labels (motion, TTC, etc.)
                 motion_text = f"Motion: {motion}"
-                speed_text = f"Speed: {frontier_speed:.1f} km/h" if frontier_speed else "Speed: N/A"
                 ttc_text = f"TTC: {ttc:.1f}s" if ttc and ttc != float('inf') else "TTC: N/A"
-                id_text = f"ID: {tid}"
+                
+                # Calculate positions for additional labels
+                label_positions = [
+                    (x1, y1 - text_height - 15),  # Motion label
+                    (x1, y1 - text_height - 30)   # TTC label
+                ]
+                
+                # Draw additional info labels
+                for i, text in enumerate([motion_text, ttc_text]):
+                    (tw, th), _ = cv2.getTextSize(text, FONT, FONT_SCALE-0.1, FONT_THICKNESS)
+                    
+                    # Determine background and text colors
+                    bg_color = (0, 0, 0) if not is_critical_event else (0, 0, 255)
+                    text_color = get_text_color(bg_color)
+                    
+                    # Draw label background
+                    cv2.rectangle(
+                        frame,
+                        (label_positions[i][0], label_positions[i][1] - th - 2),
+                        (label_positions[i][0] + tw, label_positions[i][1]),
+                        bg_color, -1
+                    )
+                    # Draw label text with appropriate color
+                    cv2.putText(
+                        frame, text,
+                        (label_positions[i][0], label_positions[i][1] - 2),
+                        FONT, FONT_SCALE-0.1, text_color, FONT_THICKNESS
+                    )
 
-                labels = [motion_text, speed_text, ttc_text, id_text]
-                label_positions = [(x1, y1 - 80 + spacing * i) for i in range(len(labels))]
-
-                overlay = frame.copy()
-                for i, (text, pos) in enumerate(zip(labels, label_positions)):
-                    (tw, tht), _ = cv2.getTextSize(text, font, fs, th)
-                    bg_pos1 = (pos[0] - pad, pos[1] - tht - pad)
-                    bg_pos2 = (pos[0] + tw + pad, pos[1] + pad)
-                    bg_color = (0, 0, 255) if is_critical_event else (0, 0, 0)
-                    cv2.rectangle(overlay, bg_pos1, bg_pos2, bg_color, -1)
-                    cv2.putText(overlay, text, pos, font, fs, (255, 255, 255), th)
-
-                cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
-                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1)
-
-                event = EventLog(vehicle_id=tid, event_type=event_type,
-                                 x1=x1, y1=y1, x2=x2, y2=y2, ttc=None if ttc == float("inf") else ttc,
-                                 latitude=gps["latitude"], longitude=gps["longitude"],
-                                 motion_status=motion)
+                # Log critical events to DB
+                event = EventLog(
+                    vehicle_id=tid,
+                    event_type=event_type,
+                    x1=x1, y1=y1, x2=x2, y2=y2,
+                    ttc=None if ttc == float("inf") else ttc,
+                    latitude=gps["latitude"],
+                    longitude=gps["longitude"],
+                    motion_status=motion
+                )
 
                 if is_critical_event:
                     db.session.add(event)
-                    db.session.flush()  # Assigns an ID without committing the transaction
+                    db.session.flush()
 
                 try:
-                    event_counter += 1  # Increment counter for each emitted event
+                    event_counter += 1
                     event_data = {
-                        "id": event_counter,  # Use the counter-based ID for SocketIO
+                        "id": event_counter,
                         "vehicle_id": tid,
                         "event_type": event_type,
                         "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
                         "x1": x1, "y1": y1, "x2": x2, "y2": y2,
                         "ttc": None if not ttc or ttc == float("inf") else round(ttc, 2),
-                        "latitude": gps["latitude"], "longitude": gps["longitude"],
+                        "latitude": gps["latitude"],
+                        "longitude": gps["longitude"],
                         "motion_status": motion,
                         "is_critical": is_critical_event
                     }
-                    logger.debug(f"Emitting event for vehicle ID {tid} (Critical: {is_critical_event})")
                     socketio.emit("new_event", event_data)
-                    logger.info(f"Emitted event data: {event_data}")
                 except Exception as e:
                     logger.error(f"Socket emit error: {e}")
 
@@ -1113,6 +1024,7 @@ def process_video(video_path):
         logger.error(f"process_video crashed: {e}")
     finally:
         cap.release()
+
 
 
 
@@ -1229,32 +1141,6 @@ def get_events():
 
 
 
-
-
-
-
-
-# @critical_events_bp.route("/list_exported_files", methods=["GET"])
-# def list_exported_files():
-#     try:
-#         files = []
-#         for idx, filename in enumerate(os.listdir(EXPORT_DIR)):
-#             if filename.endswith('.xlsx'):
-#                 file_path = os.path.join(EXPORT_DIR, filename)
-#                 timestamp = os.path.getmtime(file_path)
-#                 files.append({
-#                     "id": idx + 1,
-#                     "file_name": filename,
-#                     "timestamp": int(timestamp * 1000)
-#                 })
-#         logger.info(f"Listed {len(files)} exported files")
-#         return jsonify({"files": files})
-#     except Exception as e:
-#         logger.error(f"Error listing exported files: {e}")
-#         return jsonify({"error": "Failed to list exported files"}), 500
-
-
-
 def get_gps_data():
     with gps_lock:
         return {
@@ -1316,5 +1202,4 @@ def serve_uploaded_video(filename):
     if not os.path.exists(video_path):
         return jsonify({'error': 'File not found'}), 404
     return send_file(video_path, mimetype='video/mp4')
-
 
