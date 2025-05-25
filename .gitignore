@@ -30,3 +30,9 @@ blockchain_excles/
 
 # Ignore .env file if used for environment variables
 .env 
+
+node_modules/
+package-lock.json  # Optional for Node.js
+pip-wheel-metadata/
+dist/
+build/
