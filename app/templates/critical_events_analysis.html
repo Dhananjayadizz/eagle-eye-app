@@ -5,7 +5,7 @@
 {% block content %}
 <div class="container">
     <h2>Critical Events Analysis</h2>
-    <p>Analyze critical events (Sudden Stops, Loss of Control, TTC) and incidents in real-time.</p>
+    <p>Analyze critical events (Sudden Stops, Loss of Control, Lane Changes) and incidents in real-time.</p>
 
     <div class="row">
         <!-- Left Column: Video Display and Upload -->
@@ -13,6 +13,16 @@
             <!-- Video Display Area -->
             <div id="uploaded-video-container" class="mt-4 video-container">
                 <p class="text-center text-muted">Upload a video to see the analysis here.</p>
+            </div>
+
+            <!-- Processing Status Alert -->
+            <div id="processingStatus" class="alert alert-info mt-3" style="display: none;">
+                <div class="d-flex align-items-center">
+                    <div class="spinner-border spinner-border-sm me-2" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span>Processing video... This may take a few moments.</span>
+                </div>
             </div>
 
             <!-- Video Upload Form -->
@@ -31,15 +41,7 @@
                 </div>
             </div>
 
-            <!-- Processing Status Alert -->
-            <div id="processingStatus" class="alert alert-info mt-3" style="display: none;">
-                <div class="d-flex align-items-center">
-                    <div class="spinner-border spinner-border-sm me-2" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <span>Processing video... This may take a few moments.</span>
-                </div>
-            </div>
+
         </div>
 
         <!-- Right Column: Critical Events Table -->
@@ -53,7 +55,7 @@
                 <table class="table table-striped table-hover table-sm critical-events-table-compact">
                     <thead>
                         <tr>
-                            <th>ID</th>
+                            <!-- <th>ID</th> -->
                             <th>Time</th>
                             <th>Event Type</th>
                             <th>Vehicle ID</th>

@@ -79,6 +79,8 @@ def create_app():
     def section4():
         return render_template('pedestrians_analysis.html')
 
+
+        
     return app
 
 
@@ -101,7 +103,9 @@ def create_app():
 #         logger.error(f"Error clearing exports directory on startup: {e}")
 
 
+
 app = create_app()
+
 
 if __name__ == '__main__':
     with app.app_context():
