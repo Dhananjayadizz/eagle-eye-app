@@ -28,6 +28,24 @@
         </div>
 
         <div class="col-md-4">
+
+
+            <div class="gps-display mb-3 p-3 border rounded">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h4>Live GPS Data</h4>
+                    <button id="toggleMapSize" class="btn btn-sm btn-primary">Maximize Map</button>
+                </div>
+                <div id="gpsMap" style="height: 200px; width: 100%; border-radius: 10px;"></div>
+                <!-- Add this to your status display -->
+                <div class="mt-2">
+                    <p><strong>Latitude:</strong> <span id="gpsLatitude">--</span></p>
+                    <p><strong>Longitude:</strong> <span id="gpsLongitude">--</span></p>
+                    <p><strong>Last Update:</strong> <span id="gpsLastUpdate">--</span></p>
+                    <p><strong>Status:</strong> <span id="gpsStatus" class="text-danger">Waiting for GPS signal...</span></p>
+                </div>
+            </div>
+            
+
             <h3>Critical Events</h3>
             <!-- Export button removed as requested -->
             <div style="max-height: 600px; overflow-y: auto;">
@@ -54,9 +72,91 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize small map
+        const gpsMap = L.map('gpsMap').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(gpsMap);
+
+        let gpsMarker = null;
+        const latElem = document.getElementById('gpsLatitude');
+        const lonElem = document.getElementById('gpsLongitude');
+        const lastUpdateElem = document.getElementById('gpsLastUpdate');
+        const statusElem = document.getElementById('gpsStatus');
+        const toggleBtn = document.getElementById('toggleMapSize');
+        const mapDiv = document.getElementById('gpsMap');
+
+        // Function to fetch and update GPS data
+        function updateGPS() {
+            fetch('/get_gps_data')
+                .then(res => res.json())
+                .then(data => {
+                    // Check for valid coordinates (non-zero values)
+                    if (data.latitude && data.longitude && 
+                        data.latitude !== 0.0 && data.longitude !== 0.0) {
+                        
+                        // Update coordinates display
+                        latElem.textContent = data.latitude.toFixed(6);
+                        lonElem.textContent = data.longitude.toFixed(6);
+                        lastUpdateElem.textContent = data.last_update || '--';
+                        
+                        // Update status
+                        statusElem.textContent = 'Active';
+                        statusElem.classList.remove('text-danger');
+                        statusElem.classList.add('text-success');
+
+                        // Update map marker
+                        const newPos = [data.latitude, data.longitude];
+                        if (!gpsMarker) {
+                            gpsMarker = L.marker(newPos).addTo(gpsMap);
+                        } else {
+                            gpsMarker.setLatLng(newPos);
+                        }
+                        gpsMap.setView(newPos, 15);
+                    } else {
+                        // Handle invalid/zero coordinates
+                        statusElem.textContent = 'Waiting for GPS signal...';
+                        statusElem.classList.remove('text-success');
+                        statusElem.classList.add('text-danger');
+                        
+                        // Reset coordinates display
+                        latElem.textContent = '--';
+                        lonElem.textContent = '--';
+                        lastUpdateElem.textContent = '--';
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching GPS data:', err);
+                    statusElem.textContent = 'Connection error';
+                    statusElem.classList.remove('text-success');
+                    statusElem.classList.add('text-danger');
+                });
+        }
+
+        // Initial update and interval
+        updateGPS();
+        setInterval(updateGPS, 1000);
+
+        // Map size toggle functionality
+        toggleBtn.addEventListener('click', () => {
+            if (mapDiv.style.height === '200px') {
+                mapDiv.style.height = '400px';
+                toggleBtn.textContent = 'Minimize Map';
+            } else {
+                mapDiv.style.height = '200px';
+                toggleBtn.textContent = 'Maximize Map';
+            }
+            gpsMap.invalidateSize();
+        });
+    });
+</script>
+
 <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
 <script src="{{ url_for('static', filename='js/livestream.js') }}"></script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script src="{{ url_for('static', filename='js/video-placeholder.js') }}"></script>
-
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 {% endblock %}

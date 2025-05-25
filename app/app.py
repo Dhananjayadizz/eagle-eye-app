@@ -79,6 +79,8 @@ def create_app():
     def section4():
         return render_template('pedestrians_analysis.html')
 
+
+        
     return app
 
 

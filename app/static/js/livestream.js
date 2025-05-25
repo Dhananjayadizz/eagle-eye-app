@@ -20,6 +20,10 @@ let frameInterval = 100; // Default 10 FPS (100ms)
 let frameQuality = 0.5; // Default medium quality
 let frameResolution = { width: 640, height: 480 }; // Default medium resolution
 
+
+
+
+
 // Show loading indicator
 function showLoading() {
     if (loadingIndicator) {
@@ -322,3 +326,5 @@ document.addEventListener('DOMContentLoaded', () => {
         processedImg.src = '/static/images/video-placeholder.jpg';
     }
 });
+
+

@@ -46,7 +46,11 @@ function showAlert(message, type) {
 
 
 document.addEventListener('DOMContentLoaded', () => {
-    stopCameraButton.disabled = true;
+    // Properly reference the button and check existence
+    const stopCameraButton = document.getElementById('stop-camera');
+    if (stopCameraButton) {
+        stopCameraButton.disabled = true;
+    }
 
     const tabElList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tab"]'));
     tabElList.forEach(tabEl => {
@@ -55,3 +59,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     populateCameraOptions();
 });
+

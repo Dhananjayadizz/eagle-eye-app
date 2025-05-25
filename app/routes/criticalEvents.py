@@ -66,6 +66,10 @@ from app.core.motion_detection import detect_motion_changes
 
 from threading import Lock
 
+import torch
+torch.backends.cudnn.benchmark = True
+
+
 # Global GPS data and lock
 gps_data = {
     "latitude": 0.0,
@@ -75,8 +79,15 @@ gps_data = {
 gps_lock = Lock()
 
 
+
+# @app.route('/get_gps_data')
+# def get_gps_data():
+#     return jsonify(gps_data)
+
+
 critical_events_bp = Blueprint('critical_events', __name__)
 logger = logging.getLogger(__name__)
+
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 logger.info(f"Using device: {device}")
@@ -754,6 +765,7 @@ def process_video(video_path):
         return (0, 0, 0) if brightness > 150 else (255, 255, 255)  # Black or white
 
     try:
+        frame_count = 0
         while cap.isOpened():
             success, frame = cap.read()
             if not success:
@@ -763,6 +775,9 @@ def process_video(video_path):
             frame_count += 1
             if frame_count % 2 == 0:
                 continue  # Skip every other frame to reduce load
+            # Periodically clear GPU cache
+            if frame_count % 30 == 0:
+                torch.cuda.empty_cache()
 
             frame = cv2.resize(frame, (640, 480))
             height, width = frame.shape[:2]

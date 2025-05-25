@@ -10,6 +10,7 @@ import logging
 #     clear_exports_directory()
 #     db.create_all()
 
+
 __all__ = ['app', 'socketio', 'read_gps_data_from_serial']
 
 if __name__ == '__main__':
