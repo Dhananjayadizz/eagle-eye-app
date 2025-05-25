@@ -1,4 +1,4 @@
-; // criticalEvents.js
+// criticalEvents.js
  const socket = io();  // 👈 this initializes Socket.IO connection
 
 
